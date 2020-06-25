@@ -11,7 +11,6 @@ void TextoInicial(void)
 {
     printf("  -------------------------------------------------------\n");
     printf("                   LECTOR uSD\n");
-    printf("                 LEER DATOS DE uSD\n");
     printf("  -------------------------------------------------------\n");
     printf("    Ingrese la letra de la unidad de memoria micro SD.\n");
     printf("    >> Unidad: ");

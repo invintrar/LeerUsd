@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <windows.h>
 #include "funciones.h"
 
 #define BUFFER_SIZE 512
-#define SECTOR_INICIAL 32953
+#define SECTOR_INICIAL 35000
 #define MAX_READ_TRY 100 // maximo numero de intentos de leer informacion de la memoria
 
 // Para abirir la unidad de memoria micro SD
@@ -14,33 +15,21 @@ char volume_name[7] = "\\\\.\\X:"; /*  "\\.\X:"  */
 
 // Variable para almacenar el sector de memoria
 unsigned long sector = SECTOR_INICIAL;
-long x0, x1, x2, x3;
-long valorX;
-long valorY;
-long valorZ;
-float fvX, fvY, fvZ;
-
+uint8_t cabezera = 1;
+uint8_t idNodo = 0;
+uint8_t running = 1;
+uint8_t i = 0;
+char tmp[1024];
 // Buffer para almacenar el contenido de cada sector de memoria
-unsigned char buffer[BUFFER_SIZE] = {0};
+uint8_t buffer[BUFFER_SIZE] = {0};
 
 int main(void)
 {
-    unsigned char sd = 1;
-    int contador = 1, i = 0;
-    valorX = 1;
-    valorY = 1;
-    valorZ = 1;
     TextoInicial();
     scanf("%c", &volume_name[4]); // se cambia la 'X'(volume_name[4]) por la letra correspondiente a la micro SD
     fflushstdin();
-
-    // Se abre la unidad de memoria micro SD en modo lectura "r"
     volume = fopen(volume_name, "r");
     setbuf(volume, NULL); // Desactiva buffering
-
-    fp = fopen("fichero.txt", "a");
-    fprintf(fp, "%10s%10s%10s\n", "Eje X", "Eje Y", "Eje Z");
-
     // Check de la unidad
     if (!volume)
     {
@@ -51,10 +40,9 @@ int main(void)
     else
     {
         printf("    >> Memoria seleccionada correctamente\n");
-        printf("    >> Sector a leer N %d, espere...\n", sector);
     }
     // Bucle de generación de archivos
-    while (1)
+    while (running)
     {
         if (fseek(volume, sector * BUFFER_SIZE, SEEK_SET) != 0)
         {
@@ -65,68 +53,71 @@ int main(void)
         }
         // Lee en 'buffer' el contenido del sector de memoria
         fread(buffer, sizeof(*buffer), BUFFER_SIZE, volume);
-        i = 0;
-        while (i < 504)
+        if (cabezera)
         {
-            if (valorX == 0 && valorY == 0 && valorZ == 0)
+            if (buffer[0] != 0)
             {
-                sd = 0;
-                break;
+                cabezera = 0;
+                sprintf(tmp, "DatosNod%d.txt", buffer[0]);
+                fp = fopen(tmp, "a");
+                fprintf(fp, "Fecha: %02d/%02d/%02d\n", buffer[5], buffer[6], buffer[7]);
+                fprintf(fp, "Hora: %02d:%02d:%02d\n", buffer[3], buffer[2], buffer[1]);
+                uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
+                                        (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
+                fprintf(fp, "Nano Segundos: %ld\n\n\n\n", nanosegundos);
+                fprintf(fp, "%10s%10s%10s\n", "Eje X", "Eje Y", "Eje Z");
+                sector++;
             }
-            x3 = buffer[i];
-            x3 <<= 12;
-            x2 = buffer[i + 1];
-            x2 <<= 4;
-            x1 = buffer[i + 2];
-            x1 >>= 4;
-            valorX = x3 | x2 | x1;
-            if ((valorX & 0x80000) == 0x80000)
+            else
             {
-                valorX = ~(valorX) & 0x00FFFFF;
-                valorX = ~(valorX);
+                printf("    >> No existe datos para leer\n");
+                running = 0;
             }
-            fvX = valorX / 256000.00;
-            x3 = buffer[i + 3];
-            x3 <<= 12;
-            x2 = buffer[i + 4];
-            x2 <<= 4;
-            x1 = buffer[i + 5];
-            x1 >>= 4;
-            valorY = x3 | x2 | x1;
-            if ((valorY & 0x80000) == 0x80000)
-            {
-                valorY = ~(valorY)&0x0FFFFF;
-                valorY = ~(valorY);
-            }
-            fvZ = valorZ / 256000.00;
-            x3 = buffer[i + 6];
-            x3 <<= 12;
-            x2 = buffer[i + 7];
-            x2 <<= 4;
-            x1 = buffer[i + 8];
-            x1 >>= 4;
-            valorZ = x3 | x2 | x1;
-            if ((valorZ & 0x80000) == 0x80000)
-            {
-                valorZ = ~(valorZ)&0x0FFFFF;
-                valorZ = ~(valorZ);
-            }
-            fvY = valorY / 256000.00;
-            //printf("%3.3f %3.3f %3.3f\n", fvX,fvY,fvZ);
-            fprintf(fp, "%10f%10f%10f\n", fvX, fvY, fvZ);
-            i += 9;
         }
-        if (sd == 0)
-            break;
-        sector++;
-        //break;
+        else
+        {
+            i = 0;
+            while (i < 496)
+            {
+                int aux, fX, fY, fZ;
+                aux = 0;
+                aux = (int)buffer[i] << 12 | (int)buffer[i + 1] << 4 | (int)buffer[i + 2] >> 4;
+                if ((aux & (1 << 19)) != 0)
+                    aux = aux | ~((1 << 20) - 1);
+                fX = aux;
+                //fX = aux / 256000.00;
+
+                aux = 0;
+                aux = (int)buffer[i + 3] << 12 | (int)buffer[i + 4] << 4 | (int)buffer[i + 5] >> 4;
+                if ((aux & (1 << 19)) != 0)
+                    aux = aux | ~((1 << 20) - 1);
+                fY = aux;
+                //fY = aux / 256000.00;
+
+                aux = 0;
+                aux = (int)buffer[i + 6] << 12 | (int)buffer[i + 7] << 4 | (int)buffer[i + 8] >> 4;
+                if ((aux & (1 << 19)) != 0)
+                    aux = aux | ~((1 << 20) - 1);
+                //fZ = aux / 256000.00;
+                fZ = aux;
+                if (fX == 0 && fY == 0 && fZ == 0)
+                {
+                    printf("    >> Lecturan Terminada correctamente");
+                    running = 0;
+                }
+                else
+                {
+                    fprintf(fp, "%10d\t%10d\t%10d\n", fX, fY, fZ);
+                    i += 9;
+                }
+            }
+            sector++;
+        }
     }
-    printf(" >> Se lee hasta el sector %d\n", sector);
     fclose(fp);
     fclose(volume);
     Sleep(1000);
     return 0;
 } // end main
-
 
 /* End File */
