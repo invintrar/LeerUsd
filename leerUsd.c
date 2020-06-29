@@ -5,7 +5,7 @@
 #include "funciones.h"
 
 #define BUFFER_SIZE 512
-#define SECTOR_INICIAL 35000
+#define SECTOR_INICIAL 40000
 #define MAX_READ_TRY 100 // maximo numero de intentos de leer informacion de la memoria
 
 // Para abirir la unidad de memoria micro SD
@@ -14,11 +14,12 @@ FILE *fp;
 char volume_name[7] = "\\\\.\\X:"; /*  "\\.\X:"  */
 
 // Variable para almacenar el sector de memoria
-unsigned long sector = SECTOR_INICIAL;
+uint32_t sector = SECTOR_INICIAL;
 uint8_t cabezera = 1;
 uint8_t idNodo = 0;
 uint8_t running = 1;
-uint8_t i = 0;
+uint8_t iteratorZero = 0;
+uint16_t i = 0;
 char tmp[1024];
 // Buffer para almacenar el contenido de cada sector de memoria
 uint8_t buffer[BUFFER_SIZE] = {0};
@@ -53,20 +54,29 @@ int main(void)
         }
         // Lee en 'buffer' el contenido del sector de memoria
         fread(buffer, sizeof(*buffer), BUFFER_SIZE, volume);
+        // Crea el archivo y guarda la informacion del primer bloque en el archivo
         if (cabezera)
         {
             if (buffer[0] != 0)
             {
                 cabezera = 0;
-                sprintf(tmp, "DatosNod%d.txt", buffer[0]);
-                fp = fopen(tmp, "a");
-                fprintf(fp, "Fecha: %02d/%02d/%02d\n", buffer[5], buffer[6], buffer[7]);
-                fprintf(fp, "Hora: %02d:%02d:%02d\n", buffer[3], buffer[2], buffer[1]);
-                uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
-                                        (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
-                fprintf(fp, "Nano Segundos: %ld\n\n\n\n", nanosegundos);
-                fprintf(fp, "%10s%10s%10s\n", "Eje X", "Eje Y", "Eje Z");
-                sector++;
+                sprintf(tmp, "DatosNodo%02d.txt", buffer[0]);
+                fp = fopen(tmp, "at");
+                if (fp == NULL)
+                {
+                    printf("Error al crear el archivo\n");
+                }
+                else
+                {
+                    fprintf(fp, "Nodo%02d\n", buffer[0]);
+                    fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[5], (uint8_t)buffer[6], (uint8_t)buffer[7]);
+                    fprintf(fp, "Hora: %02d:%02d:%02d\n", (uint8_t)buffer[3], (uint8_t)buffer[2], (uint8_t)buffer[1]);
+                    uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
+                                            (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
+                    fprintf(fp, "NanoSegundos: %ld ns\n\n", (nanosegundos * 25));
+                    fprintf(fp, "%10s%10s%10s\n", "Eje X", "Eje Y", "Eje Z");
+                    sector++;
+                }
             }
             else
             {
@@ -79,37 +89,33 @@ int main(void)
             i = 0;
             while (i < 496)
             {
+                if ((buffer[2] & 0x0F) == 0)
+                {
+                    printf("    >> Lecturan Terminada correctamente");
+                    running = 0;
+                    break;
+                }
                 int aux, fX, fY, fZ;
                 aux = 0;
                 aux = (int)buffer[i] << 12 | (int)buffer[i + 1] << 4 | (int)buffer[i + 2] >> 4;
                 if ((aux & (1 << 19)) != 0)
                     aux = aux | ~((1 << 20) - 1);
                 fX = aux;
-                //fX = aux / 256000.00;
 
                 aux = 0;
                 aux = (int)buffer[i + 3] << 12 | (int)buffer[i + 4] << 4 | (int)buffer[i + 5] >> 4;
                 if ((aux & (1 << 19)) != 0)
                     aux = aux | ~((1 << 20) - 1);
                 fY = aux;
-                //fY = aux / 256000.00;
 
                 aux = 0;
                 aux = (int)buffer[i + 6] << 12 | (int)buffer[i + 7] << 4 | (int)buffer[i + 8] >> 4;
                 if ((aux & (1 << 19)) != 0)
                     aux = aux | ~((1 << 20) - 1);
-                //fZ = aux / 256000.00;
                 fZ = aux;
-                if (fX == 0 && fY == 0 && fZ == 0)
-                {
-                    printf("    >> Lecturan Terminada correctamente");
-                    running = 0;
-                }
-                else
-                {
-                    fprintf(fp, "%10d\t%10d\t%10d\n", fX, fY, fZ);
-                    i += 9;
-                }
+
+                fprintf(fp, "%10d\t%10d\t%10d\n", fX, fY, fZ);
+                i += 9;
             }
             sector++;
         }
