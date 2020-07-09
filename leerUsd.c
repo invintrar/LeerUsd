@@ -69,13 +69,13 @@ int main(void)
                 else
                 {
                     fprintf(fp, "Nodo%02d\n", buffer[0]);
-                    fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[5], (uint8_t)buffer[6], (uint8_t)buffer[7]);
+                    fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[6], (uint8_t)buffer[5], (uint8_t)buffer[7]);
                     fprintf(fp, "Hora: %02d:%02d:%02d\n", (uint8_t)buffer[3], (uint8_t)buffer[2], (uint8_t)buffer[1]);
                     uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
                                             (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
                     fprintf(fp, "NanoSegundos: %ld ns\n\n", (nanosegundos * 25));
                     fprintf(fp, "%10s%10s%10s\n", "Eje X", "Eje Y", "Eje Z");
-                    sector++;
+                    sector += 1;
                 }
             }
             else
