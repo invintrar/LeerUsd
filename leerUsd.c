@@ -5,12 +5,13 @@
 #include "funciones.h"
 
 #define BUFFER_SIZE 512
-#define SECTOR_INICIAL 40000// Nodo1:33856, Nodo2:40000
-#define MAX_READ_TRY 100 // maximo numero de intentos de leer informacion de la memoria
+#define SECTOR_INICIAL 40000 // Nodo1:33856, Nodo2:40000
+#define MAX_READ_TRY 100     // maximo numero de intentos de leer informacion de la memoria
 
 // Para abirir la unidad de memoria micro SD
 FILE *volume;
 FILE *fp;
+FILE *fp1;
 char volume_name[7] = "\\\\.\\X:"; /*  "\\.\X:"  */
 
 // Variable para almacenar el sector de memoria
@@ -61,15 +62,18 @@ int main(void)
             if (buffer[0] != 0)
             {
                 cabezera = 0;
-                
-                sprintf(tmp1, "EncabezadoNodo%02d.txt",buffer[0]);
+
+                sprintf(tmp1, "EncabezadoNodo%02d.txt", buffer[0]);
                 fp = fopen(tmp1, "at");
-                if(fp == NULL){
+                if (fp == NULL)
+                {
                     printf("Error al crear el archivo\n");
-                }else{
+                }
+                else
+                {
                     fprintf(fp, "Nodo%02d\n", buffer[0]);
-                    fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[6]-1, (uint8_t)buffer[5], (uint8_t)buffer[7]);
-                    fprintf(fp, "Hora: %02d:%02d:%02d\n", (uint8_t)buffer[3]-5, (uint8_t)buffer[2], (uint8_t)buffer[1]);
+                    fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[6] - 1, (uint8_t)buffer[5], (uint8_t)buffer[7]);
+                    fprintf(fp, "Hora: %02d:%02d:%02d\n", (uint8_t)buffer[3] - 5, (uint8_t)buffer[2], (uint8_t)buffer[1]);
                     uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
                                             (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
                     fprintf(fp, "NanoSegundos: %ld ns\n", (nanosegundos * 25));
@@ -77,7 +81,7 @@ int main(void)
                 }
                 fclose(fp);
 
-                sprintf(tmp, "20%02d%02d%02d%02d%02d%02dN%02d.txt", buffer[7], buffer[6]-1, buffer[5], buffer[3]-5, buffer[2], buffer[1], buffer[0]);//200720203960N9.txt  con aammddhhmmssNx.txt
+                sprintf(tmp, "20%02d%02d%02d%02d%02d%02dN%02d.txt", buffer[7], buffer[6] - 1, buffer[5], buffer[3] - 5, buffer[2], buffer[1], buffer[0]); //200720203960N9.txt  con aammddhhmmssNx.txt
                 fp = fopen(tmp, "at");
                 if (fp == NULL)
                 {
@@ -95,7 +99,26 @@ int main(void)
             i = 0;
             while (i < 496)
             {
-                if (buffer[511]  != 0x73)
+                if (buffer[0] == buffer[12])
+                {
+                    sprintf(tmp1, "FinArchivoN%02d.txt", buffer[0]);
+                    fp1 = fopen(tmp1, "at");
+                    if (fp1 == NULL)
+                    {
+                        printf("Error al crear el archivo\n");
+                    }
+                    else
+                    {
+                        fprintf(fp, "Nodo%02d\n", buffer[0]);
+                        fprintf(fp, "Fecha: %02d/%02d/%02d\n", (uint8_t)buffer[6] - 1, (uint8_t)buffer[5], (uint8_t)buffer[7]);
+                        fprintf(fp, "Hora: %02d:%02d:%02d\n", (uint8_t)buffer[3] - 5, (uint8_t)buffer[2], (uint8_t)buffer[1]);
+                        uint32_t nanosegundos = (int32_t)buffer[11] << 24 | (int32_t)buffer[10] << 16 |
+                                                (int32_t)buffer[9] << 8 | buffer[8]; // Nano Seconds
+                        fprintf(fp, "NanoSegundos: %ld ns\n", (nanosegundos * 25));
+                    }
+                    fclose(fp);
+                }
+                if (buffer[511] != 0x73)
                 {
                     printf("    >> Lecturan Terminada correctamente");
                     running = 0;
